@@ -1,39 +1,35 @@
+<#PSScriptInfo
+.VERSION 2
+.GUID d10b5afa-9179-4b97-8b73-31a3f1ac045b
+.AUTHOR brady.greenwood@outlook.com
+.COPYRIGHT 2024 Brady Greenwood, GNU GPLv3
+#>
 <#
-    File:           WindowsFirstTimeSetup.ps1
-    Version:        2
-    Last Updated:   2024-02-10
-    Usage:          ./WindowsFirstTimeSetup.ps1
-                    ./WindowsFirstTimeSetup.ps1 -SkipActivation -SkipRegistryHacks
+.SYNOPSIS
+Prepares a new Windows 11 installation by removing unnecessary applications,
+installing desired applications via Winget, applying group policy changes 
+via registry, and activates Windows/Office using Massgrave.
 
-    Note: If you're running this as a file according to 'Usage' above, you must run 
-          Set-ExecutionPolicy Unrestricted before running this script.
+.EXAMPLE
+./WindowsFirstTimeSetup.ps1
 
-    Version 2 (2024-02-10):
-        - Uninstalls widgets instead of disabling via GP registry key.
-        - Disables web search from start menu
-        - Provided switch parameters to skip registry hacks, activation, application removal, and application installations.
-        - Provided switch parameter to force uninstall of "VM-only" uninstalls on a potential non-vm system
-            - Since the distinction of "VM" apps is arbitrary, makes sense to provide a way to uninstall virtually everything.
-        - Removed use of cmdlet aliases (conform with best practices)
+.EXAMPLE
+./WindowsFirstTimeSetup.ps1 -Force
 
-    Version 1 (2024-02-10):
-        - Uninstalls majority of default applications
-            - App lists separated for VM use
-        - Installs desired applications via Winget
-            - Extra scripting to install Office 2021 VL via Office Deployment Tool
-        - Applies registry edits
-            - Remove Win11 Widgets feature
-            - Prevent auto-restart for Windows Update while user is logged in
-            - Disable Win11 context menu in favor of <= Win10 context menu
-        - Invokes Massgrave script to activate Windows and/or Office 2021 VL (internet connection req.)
+.EXAMPLE
+./WindowsFirstTimeSetup.ps1 -SkipActivation -SkipRegistryHacks
+#>
 
-    Potential Roadmap & To-do items in order of importance/ability...
-        TODO Move application lists to string[] parameters for customization.
-        TODO Provide parameters to include/exclude extra apps to remove (-IncludeAppsToRemove, -ExcludeAppsToRemove)
-        TODO Provide parameters to include/exclude extra apps to install (-IncludeAppsToInstall, -ExcludeAppsToInstall)
-        TODO Provide parameter to point to a custom XML file for ODT (-ODTConfigPath)
-        TODO Remove Microsoft Edge, if possible
-        TODO Disable unnecessary services
+<# Roadmap/To-do
+    TODO Move application lists to string[] parameters for customization.
+    TODO Provide parameters to include/exclude extra apps to remove 
+        (-IncludeAppsToRemove, -ExcludeAppsToRemove)
+    TODO Provide parameters to include/exclude extra apps to install 
+        (-IncludeAppsToInstall, -ExcludeAppsToInstall)
+    TODO Provide parameter to point to a custom XML file for ODT 
+        (-ODTConfigPath)
+    TODO Remove Microsoft Edge, if possible
+    TODO Disable unnecessary services
 #>
 
 #Requires -RunAsAdministrator
@@ -64,15 +60,16 @@ param(
     # Has no effect if $SkipDefaultAppUninstallation is $true.
     [switch]
     $ForceAllDefaultAppUninstall
-
-    
 )
 
-# Change PowerShell execution policy
-Set-ExecutionPolicy Unrestricted
+if ($IsLinux -or $IsMacOS) {
+    throw "This script is only intended to run on Windows 11."
+}
 
 $COMPUTER_MODEL = $(Get-WmiObject win32_computersystem).model
-$IS_VIRTUAL = $COMPUTER_MODEL -eq "VirtualBox" -or $COMPUTER_MODEL -eq "VMware Virtual Platform" -or $COMPUTER_MODEL -eq "Virtual Machine" # TODO: Hyper-V
+$IS_VIRTUAL = $COMPUTER_MODEL -eq "VirtualBox" -or 
+              $COMPUTER_MODEL -eq "VMware Virtual Platform" -or 
+              $COMPUTER_MODEL -eq "Virtual Machine" # TODO: Hyper-V
 $APPS_TO_REMOVE_VM = @(
 	"Microsoft.OutlookForWindows",
     "Microsoft.Paint",
@@ -175,13 +172,19 @@ if ($SkipRegistryHacks -eq $null) {
     ## Disable Windows Update auto-restart
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
-    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' -Name 'NoAutoRebootWithLoggedOnUsers' -Value 1 -PropertyType DWORD
+    New-ItemProperty -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' `
+                     -Name 'NoAutoRebootWithLoggedOnUsers' `
+                     -Value 1 `
+                     -PropertyType 'DWORD'
     ## Disable Win11 Context Menu
     New-Item -Path 'HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}'
     New-Item -Path 'HKCU:\Software\Classes\CLSID\{86ca1aa0-34aa-4e8b-a509-50c905bae2a2}\InprocServer32'
     ## Disable Web Search from Start
     New-Item -Path "HKCU:\Software\Policies\Microsoft\Windows\Explorer"
-    New-ItemProperty -Path 'HKCU:\Software\Policies\Microsoft\Windows\Explorer' -Name 'DisableSearchBoxSuggestions' -Value 1 -PropertyType 'DWORD'
+    New-ItemProperty -Path 'HKCU:\Software\Policies\Microsoft\Windows\Explorer' `
+                     -Name 'DisableSearchBoxSuggestions' `
+                     -Value 1 `
+                     -PropertyType 'DWORD'
     ## Restart File Explorer to apply changes to context menu immediately
     Get-Process 'explorer' | Stop-Process
 }
@@ -242,4 +245,14 @@ if ($SkipWingetInstalls -eq $null) {
 }
 
 # Activate Windows and/or Office
-if ($SkipActivation -eq $null) { Invoke-RestMethod https://massgrave.dev/get | Invoke-Expression }
+if ($SkipActivation -eq $null) { 
+    Write-Warning "If you are not installing on a Virtual Machine 
+    that is intended for short-term use, or otherwise have not purchased a 
+    Windows and/or Office license from Microsoft for this machine, please 
+    re-consider activating via Massgrave and purchase a license. This is *only*
+    intended as a workaround for Virtual Machines that are not in a domain with
+    volume licensing available to them.`n`n
+    Press Ctrl-C to cancel."
+    Pause
+    Invoke-RestMethod https://massgrave.dev/get | Invoke-Expression 
+}
