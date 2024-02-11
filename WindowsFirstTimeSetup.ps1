@@ -30,6 +30,10 @@ via registry, and activates Windows/Office using Massgrave.
         (-ODTConfigPath)
     TODO Remove Microsoft Edge, if possible
     TODO Disable unnecessary services
+    TODO Disable telemetry
+    TODO Provide proper -Confirm parameter support; would prompt for 
+         confirmation for individual application installs, removals, reg hacks,
+         etc. if -Confirm is passed or if $ConfirmPreference is Medium/Low
 #>
 
 #Requires -RunAsAdministrator
