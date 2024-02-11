@@ -1,0 +1,3 @@
+Prepares a new Windows 11 installation by removing unnecessary applications, installing desired applications via Winget, applying group policy changes via registry, and activates Windows/Office using Massgrave.
+
+Massgrave disclaimer: If you are not installing on a Virtual Machine that is intended for short-term use, or otherwise have not purchased a Windows and/or Office license from Microsoft for this machine, please re-consider activating via Massgrave and purchase a license. This is *only* intended as a workaround for Virtual Machines that are not in a domain with volume licensing available to them.
