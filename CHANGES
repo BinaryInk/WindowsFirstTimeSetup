@@ -1,3 +1,10 @@
+# Version 3 (2024-02-14)
+  - Collapsed all -Skip switch parameters into single -Skip string[] ValidateSet parameter.
+    - Fixed skip flag for Office VL as a result
+  - Activation is now opt-in rather than opt-out.
+  - Renamed -Force parameter to match documentation.
+  - Syntax unification on string array declarations.
+
 # Version 2 (2024-02-11):
   - Uninstalls widgets instead of disabling via GP registry key.
   - Disables web search from start menu.

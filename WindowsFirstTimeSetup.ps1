@@ -1,5 +1,5 @@
 <#PSScriptInfo
-.VERSION 2
+.VERSION 3
 .GUID d10b5afa-9179-4b97-8b73-31a3f1ac045b
 .AUTHOR brady.greenwood@outlook.com
 .COPYRIGHT 2024 Brady Greenwood, GNU GPLv3
@@ -17,7 +17,10 @@ via registry, and activates Windows/Office using Massgrave.
 ./WindowsFirstTimeSetup.ps1 -Force
 
 .EXAMPLE
-./WindowsFirstTimeSetup.ps1 -SkipActivation -SkipRegistryHacks
+./WindowsFirstTimeSetup.ps1 -Activate
+
+.EXAMPLE
+./WindowsFirstTimeSetup.ps1 -Skip 'Install', 'Office', 'Registry'
 #>
 
 <# Roadmap/To-do
@@ -34,36 +37,30 @@ via registry, and activates Windows/Office using Massgrave.
     TODO Provide proper -Confirm parameter support; would prompt for 
          confirmation for individual application installs, removals, reg hacks,
          etc. if -Confirm is passed or if $ConfirmPreference is Medium/Low
+    TODO Separate Office Deployment Tool from Winget installs.
+    TODO Automate ODT installation instead of prompting user where to install. Leverage $TEMP.
+    TODO Make Microsoft 365 version of Office default; keep 2021 VL as an option.
+    TODO Provide method to prevent installing Visio or Project.
+    TODO Error-handle if Winget is not yet updated.
 #>
 
 #Requires -RunAsAdministrator
 
 param(
-    # Skips the activation step
-    [switch]
-    $SkipActivation,
+    # Allows skipping various steps in the script.
+    # If Install is skipped, Office will be skipped.
+    [string[]]
+    [ValidateSetAttribute('Registry','Install','Office','Uninstall')]
+    $Skip,
 
-    # Skips registry hacks
+    # Runs Massgrave script at end
     [switch]
-    $SkipRegistryHacks,
-
-    # Skips installation of all applications via WinGet (including ODT)
-    [switch]
-    $SkipWingetInstalls,
-
-    # Skips the installation of Microsoft Office. 
-    # Has no effect if $SkipWingetInstalls is $true.
-    [switch]
-    $SkipOfficeDeploymentTool,
-
-    # Skips uninstallation of Windows default applications
-    [switch]
-    $SkipDefaultAppUninstallation,
+    $Activate,
 
     # Forces the uninstallation of all default applications. 
-    # Has no effect if $SkipDefaultAppUninstallation is $true.
+    # Has no effect if $Skip contains 'Uninstall'.
     [switch]
-    $ForceAllDefaultAppUninstall
+    $Force
 )
 
 if ($IsLinux -or $IsMacOS) {
@@ -75,38 +72,38 @@ $IS_VIRTUAL = $COMPUTER_MODEL -eq "VirtualBox" -or
               $COMPUTER_MODEL -eq "VMware Virtual Platform" -or 
               $COMPUTER_MODEL -eq "Virtual Machine" # TODO: Hyper-V
 $APPS_TO_REMOVE_VM = @(
-	"Microsoft.OutlookForWindows",
-    "Microsoft.Paint",
-    "Microsoft.XboxGameOverlay",
-    "MicrosoftCorporationII.QuickAssist",
-    "Microsoft.Xbox.TCUI",
+	"Microsoft.OutlookForWindows"
+    "Microsoft.Paint"
+    "Microsoft.XboxGameOverlay"
+    "MicrosoftCorporationII.QuickAssist"
+    "Microsoft.Xbox.TCUI"
     "Microsoft.XboxSpeechToTextOverlay"
-    "Microsoft.XboxIdentityProvider",
-    "Microsoft.WindowsCalculator",
-    "Microsoft.WindowsSoundRecorder",
-    "Microsoft.WindowsAlarms",
-    "Microsoft.WindowsCamera",
-    "Microsoft.PowerAutomateDesktop",
-    "Microsoft.ScreenSketch",
-    "Microsoft.XboxGamingOverlay",
-    "Microsoft.GamingApp",
+    "Microsoft.XboxIdentityProvider"
+    "Microsoft.WindowsCalculator"
+    "Microsoft.WindowsSoundRecorder"
+    "Microsoft.WindowsAlarms"
+    "Microsoft.WindowsCamera"
+    "Microsoft.PowerAutomateDesktop"
+    "Microsoft.ScreenSketch"
+    "Microsoft.XboxGamingOverlay"
+    "Microsoft.GamingApp"
     "Microsoft.XboxGameCallableUI"
 )
 $APPS_TO_REMOVE = @(
-	"Microsoft.OneDriveSync",
-	"Microsoft.BingNews",
-    "Microsoft.People",
-    "Microsoft.BingWeather",
-    "Microsoft.WindowsMaps",
-    "Microsoft.GetHelp",
+	"Microsoft.OneDriveSync"
+	"Microsoft.BingNews"
+    "Microsoft.People"
+    "Microsoft.BingWeather"
+    "Microsoft.WindowsMaps"
+    "Microsoft.GetHelp"
     "Microsoft.MicrosoftStickyNotes"
-    "Microsoft.Getstarted",
-    "Microsoft.MicrosoftOfficeHub",
-    "Microsoft.549981C3F5F10", # Cortana
-    "Microsoft.Todos",
-    "Microsoft.ZuneMusic",
-    "Microsoft.ZuneVideo",
-    "Clipchamp.Clipchamp",
+    "Microsoft.Getstarted"
+    "Microsoft.MicrosoftOfficeHub"
+    "Microsoft.549981C3F5F10" # Cortana
+    "Microsoft.Todos"
+    "Microsoft.ZuneMusic"
+    "Microsoft.ZuneVideo"
+    "Clipchamp.Clipchamp"
     "microsoft.windowscommunicationsapps"
     "Microsoft.MicrosoftSolitaireCollection"
     "Microsoft.YourPhone"
@@ -162,16 +159,16 @@ $ODT_XML_FILE = @"
 </Configuration>
 "@
 $ODT_FILE_REMOVES = @(
-	"$env:USERPROFILE\configuration-Office365-x64.xml",
-    "$env:USERPROFILE\configuration-Office365-x86.xml",
-    "$env:USERPROFILE\configuration-Office2019Enterprise.xml",
-    "$env:USERPROFILE\configuration-Office2021Enterprise.xml",
-    "$env:USERPROFILE\ODT.xml",
+	"$env:USERPROFILE\configuration-Office365-x64.xml"
+    "$env:USERPROFILE\configuration-Office365-x86.xml"
+    "$env:USERPROFILE\configuration-Office2019Enterprise.xml"
+    "$env:USERPROFILE\configuration-Office2021Enterprise.xml"
+    "$env:USERPROFILE\ODT.xml"
     "$env:USERPROFILE\setup.exe"
 )
 
 # Registry hacks
-if ($SkipRegistryHacks -eq $null) {
+if ($Skip -notcontains 'Registry') {
     Write-Host 'Applying group policy and registry settings...'
     ## Disable Windows Update auto-restart
     New-Item -Path 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
@@ -194,7 +191,7 @@ if ($SkipRegistryHacks -eq $null) {
 }
 
 # Windows Store Default Apps removal
-if ($SkipDefaultAppUninstallation -eq $null) {
+if ($Skip -notcontains 'Uninstall') {
     Write-Host 'Removing pre-installed applications...'
     foreach ($app in $APPS_TO_REMOVE) {
         Write-Verbose "`tRemoving $app for current user..."
@@ -222,7 +219,7 @@ if ($SkipDefaultAppUninstallation -eq $null) {
 }
 
 # Winget Installations
-if ($SkipWingetInstalls -eq $null) {
+if ($Skip -notcontains 'Install') {
     Write-Host 'Installing apps via WinGet...'
     foreach ($app in $WINGET_TO_INSTALL) {
         Write-Verbose "Installing $app..."
@@ -237,7 +234,7 @@ if ($SkipWingetInstalls -eq $null) {
         winget install $app --interactive
     }
 
-    if ($SkipOfficeDeploymentTool) {
+    if ($Skip -notcontains 'Office') {
         # MSOffice Install (2021 VL)
         Write-Host 'Installing Office via Office Deployment Tool...'
         $ODT_XML_FILE | Out-File "$env:USERPROFILE\ODT.xml"
@@ -249,13 +246,9 @@ if ($SkipWingetInstalls -eq $null) {
 }
 
 # Activate Windows and/or Office
-if ($SkipActivation -eq $null) { 
-    Write-Warning "If you are not installing on a Virtual Machine 
-    that is intended for short-term use, or otherwise have not purchased a 
-    Windows and/or Office license from Microsoft for this machine, please 
-    re-consider activating via Massgrave and purchase a license. This is *only*
-    intended as a workaround for Virtual Machines that are not in a domain with
-    volume licensing available to them.`n`n
+if ($Activate) { 
+    Write-Warning "If you have not purchased a Windows and/or Office license from Microsoft for the machine which you are installing Windows on (VM or directly), please do not use the '-Activate' switch. This is *only* included for hobby use or a virtual machine on a device which already has a digital license that cannot be leveraged due to a VM's different hardware signature (i.e., a Windows VM on Linux or MacOS to prevent the need for dual-booting/bootcamp)`n`n
+    This script is not a part of the WindowsFirstTimeSetup.ps1 script. Please see https://massgrave.dev/ and/or https://github.com/massgravel/Microsoft-Activation-Scripts for more information.`n`n
     Press Ctrl-C to cancel."
     Pause
     Invoke-RestMethod https://massgrave.dev/get | Invoke-Expression 
