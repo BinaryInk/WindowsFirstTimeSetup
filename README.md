@@ -10,7 +10,9 @@ Prepares a new Windows 11 installation by removing unnecessary applications, ins
 - **Disable Web Search from Start Menu**
   - ADD KEY: HKCU:\Software\Policies\Microsoft\Windows\Explorer
     - ADD DWORD: DisableSearchBoxSuggestions = 1
-
+- **Disable telemetry**
+  - KEY: HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection
+    - ADD DWORD: AllowTelemetry
 
 # Application Installs & Uninstalls
 
@@ -50,7 +52,6 @@ Prepares a new Windows 11 installation by removing unnecessary applications, ins
 - Microsoft.ScreenSketch
 - Microsoft.XboxGamingOverlay
 - Microsoft.GamingApp
-- Microsoft.XboxGameCallableUI
 
 ## Apps installed via Winget (silently)
 - Mozilla.Firefox
