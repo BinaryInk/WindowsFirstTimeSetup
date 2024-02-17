@@ -1,3 +1,5 @@
+# Version 4.1 (2024-02-26)
+- Fixed -IncludeWingetApps
 # Version 4 (2024-02-15)
   ## New
     - Registry: Added registry change to disable telemetry

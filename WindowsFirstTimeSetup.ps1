@@ -286,8 +286,9 @@ function Start-WingetInstalls() {
             $app.Install()
         }
     }
-    foreach ($app in $IncludeWingetApps) {
+    foreach ($appName in $IncludeWingetApps) {
         if ($ExcludeWingetApps -notcontains $app) {
+            $app = [CustomWingetApp]::new($appName)
             Write-Host "Installing Winget App: $($app.DisplayName)"
             $app.Install()
         }
